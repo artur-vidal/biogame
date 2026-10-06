@@ -70,9 +70,19 @@ Biogame.Assets = {
   _resolveSrc(key) {
     const val = window.BiogameAssets.images[key];
     if (!val) return this.DEFAULT_IMAGES[key];
+
+    let src = val;
     if (Array.isArray(val)) {
-      return val[Math.floor(Math.random() * val.length)];
+      src = val[Math.floor(Math.random() * val.length)];
     }
-    return val;
+
+    // Garante que o caminho seja relativo ao diretório do index.html
+    // Se o src já começa com 'assets/', mantemos. Se não, adicionamos.
+    if (src && !src.startsWith('assets/')) {
+      src = 'assets/' + src;
+    }
+
+    return src;
   }
+
 };
