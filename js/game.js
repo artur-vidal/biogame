@@ -66,9 +66,14 @@ Biogame.Game = {
     // Libera genes iniciais
     this.state.unlocked = Biogame.DATA.types.map((type, idx) => {
       const isUnlocked = config.unlockAtCorrect[idx] === 0;
-      if (isUnlocked) this.state.pendingNew.push(type.id);
+      if (isUnlocked) {
+        this.state.pendingNew.push(type.id);
+        // Notifica a UI imediatamente para desbloquear os botões iniciais
+        this.emit('type-unlocked', { typeId: type.id });
+      }
       return isUnlocked;
     });
+
 
     this.state.gapLeft = config.threat.gapStart;
     this.state.lockLeft = 0;
