@@ -387,11 +387,12 @@ Biogame.UI = {
   },
 
   removeBubble() {
-    if (this.elements.currentBubble) {
-      this.elements.currentBubble.remove();
-      this.elements.currentBubble = null;
-    }
+    // Remove todas as bolhas de ameaça ativas do DOM
+    const bubbles = document.querySelectorAll('.threat-bubble');
+    bubbles.forEach(b => b.remove());
+    this.elements.currentBubble = null;
   },
+
 
   update() {
     const state = Biogame.Game.state;
