@@ -326,7 +326,7 @@ Biogame.UI = {
   onGeneCorrect({ plantId, typeId, points, multiplier }) {
     this.updateHUD();
     this.updateGarden();
-    this.removeBubble();
+    this.removeBubble(typeId);
 
     const type = Biogame.DATA.types.find(t => t.id === typeId);
     this.elements.factText.textContent = type.fact;
@@ -386,12 +386,19 @@ Biogame.UI = {
                        <button class="btn-primary" onclick="location.reload()">${Biogame.STR.over.again}</button>`;
   },
 
-  removeBubble() {
-    // Remove todas as bolhas de ameaça ativas do DOM
-    const bubbles = document.querySelectorAll('.threat-bubble');
-    bubbles.forEach(b => b.remove());
+  removeBubble(typeId = null) {
+    if (typeId) {
+      // Remove apenas a bolha da ameaça resolvida
+      const bubble = document.querySelector(`.threat-bubble[data-type="${typeId}"]`);
+      if (bubble) bubble.remove();
+    } else {
+      // Remove todas as bolhas (usado em erros graves ou fim de jogo)
+      const bubbles = document.querySelectorAll('.threat-bubble');
+      bubbles.forEach(b => b.remove());
+    }
     this.elements.currentBubble = null;
   },
+
 
 
   update() {
