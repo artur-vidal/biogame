@@ -1,4 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M32 10 Q 42 10 45 20 Q 45 32 32 32 Q 19 32 19 20 Q 22 10 32 10" stroke="#888" stroke-width="4" fill="none" />
-  <path d="M32 32 Q 42 32 45 40 Q 45 52 32 52 Q 19 52 19 40 Q 22 32 32 32" stroke="#888" stroke-width="4" fill="none" />
+  <path d="M32 55 C 10 40, 5 25, 15 15 C 25 5, 32 15, 32 15 C 32 15, 39 5, 49 15 C 59 25, 54 40, 32 55"
+        fill="none" stroke="#888" stroke-width="3" />
 </svg>

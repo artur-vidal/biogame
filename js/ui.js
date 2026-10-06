@@ -257,7 +257,12 @@ Biogame.UI = {
       if (plantId !== null) {
         const plant = state.plants.find(p => p.id === plantId);
         if (plant && plant.status === 'alive') {
-          const plantImg = Biogame.Assets.createImg(plant.variant);
+          // Usar a chave da imagem em vez do caminho direto
+          const imgKey = plant.variant.includes('assets/img/') ?
+                         plant.variant.split('/').pop().replace('.svg', '') :
+                         plant.variant;
+
+          const plantImg = Biogame.Assets.createImg(imgKey);
           plantElem.appendChild(plantImg);
 
           const badges = document.createElement('div');
