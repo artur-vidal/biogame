@@ -36,10 +36,11 @@ Biogame.Main = {
 
   loop() {
     const now = performance.now();
-    const dt = Math.min((now - this.lastTime) / 1000, 0.1); // Limit delta a 100ms
+    const dt = Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
 
     Biogame.Game.update(dt);
+    Biogame.UI.update();
 
     requestAnimationFrame(() => this.loop());
   }
