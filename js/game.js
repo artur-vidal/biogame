@@ -21,7 +21,7 @@ Biogame.Game = {
     correctCount: 0,
     plants: [],
     plots: [],
-    threats: [], // Agora é uma lista para suportar múltiplas ameaças simultâneas
+    threats: [],
     gapLeft: 0,
     lockLeft: 0,
     unlocked: [],
@@ -29,7 +29,7 @@ Biogame.Game = {
     answeredTypes: [],
     cloned: false,
     endReason: null,
-    lastTargetId: null // Para evitar que a mesma planta peça genes consecutivamente
+    lastTargetId: null
   },
 
   emit(name, detail = {}) {
@@ -88,7 +88,7 @@ Biogame.Game = {
     const plant = {
       id,
       plot: plotIdx,
-      genes: [], // Fix: TODA planta começa com genes zerados
+      genes: [], // Toda planta inicia zerada
       status: 'alive',
       variant: plantVariant
     };
@@ -138,6 +138,20 @@ Biogame.Game = {
     const timeTotal = Math.max(config.threat.minTime, config.threat.startTime - config.threat.step * this.state.correctCount);
     const gap = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
+    // Lógica para múltiplas ameaças simultâneas
+    // Se houver poucas ameaças ativas, spawna mais uma
+    if (this.state.threats.length < 3 && this.rng() < 0.3) {
+       this.createSingleThreat(timeTotal, gap);
+    }
+
+    // Spawna a ameaça principal do ciclo
+    this.createSingleThreat(timeTotal, gap);
+  },
+
+  createSingleThreat(timeTotal, gap) {
+    const config = Biogame.CONFIG;
+    const types = Biogame.DATA.types;
+
     let typeId;
     if (this.state.pendingNew.length > 0) {
       typeId = this.state.pendingNew.shift();
@@ -145,7 +159,7 @@ Biogame.Game = {
     } else {
       const unlockedTypes = types.filter((t, idx) => this.state.unlocked[idx]);
       let possibleTypes = unlockedTypes;
-      if (unlockedTypes.length > 1 && this.state.threats.length > 0) {
+      if (unlockedTypes.length > 1) {
         const activeTypes = this.state.threats.map(t => t.typeId);
         possibleTypes = unlockedTypes.filter(t => !activeTypes.includes(t.id));
         if (possibleTypes.length === 0) possibleTypes = unlockedTypes;
@@ -155,12 +169,8 @@ Biogame.Game = {
     }
 
     const alivePlants = this.state.plants.filter(p => p.status === 'alive');
-    if (alivePlants.length === 0) {
-      this.end('extinct');
-      return;
-    }
+    if (alivePlants.length === 0) return;
 
-    // Fix: A mesma planta não deve pedir dois genes consecutivamente
     const availableTargets = alivePlants.filter(p => p.id !== this.state.lastTargetId);
     const targets = availableTargets.length > 0 ? availableTargets : alivePlants;
 
@@ -177,8 +187,6 @@ Biogame.Game = {
     if (targetPlant.genes.includes(typeId)) {
       this.emit('threat-spawned', { typeId, plantId: targetPlant.id, auto: true });
       this.resolveAutoDefense();
-      this.state.gapLeft = gap;
-      this.state.lockLeft = config.autoDefenseTime;
     } else {
       this.state.threats.push({
         typeId,
@@ -187,7 +195,6 @@ Biogame.Game = {
         timeLeft: timeTotal
       });
       this.emit('threat-spawned', { typeId, plantId: targetPlant.id, auto: false });
-      this.state.gapLeft = gap;
     }
   },
 
@@ -200,7 +207,6 @@ Biogame.Game = {
     if (this.state.phase !== 'playing' || this.state.threats.length === 0) return;
     if (!this.state.unlocked[Biogame.DATA.types.findIndex(t => t.id === typeId)]) return;
 
-    // Bug Fix: O erro só ocorre se o gene não for pedido por NENHUMA planta ativa
     const targetIndex = this.state.threats.findIndex(t => t.typeId === typeId);
 
     if (targetIndex !== -1) {
@@ -253,7 +259,6 @@ Biogame.Game = {
       this.state.combo = 0;
       this.emit('gene-wrong', { chosen: chosenId, expected: 'Qualquer um dos genes pedidos' });
 
-      // Remove todas as ameaças atuais para penalizar o erro
       this.state.threats = [];
       this.state.lockLeft = config.wrongRecoveryTime;
       this.state.gapLeft = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);

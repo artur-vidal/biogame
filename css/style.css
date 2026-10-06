@@ -176,9 +176,18 @@ body {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 4px;
+  justify-content: center;
+  gap: 2px;
   z-index: 3;
+  width: auto;
 }
+
+.badges img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
 
 
 .badge {

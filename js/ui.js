@@ -190,6 +190,8 @@ Biogame.UI = {
     this.elements.geneBtns.forEach(btn => {
       btn.onclick = () => {
         const typeId = btn.dataset.type;
+        // Remove a badge "NOVO!" ao clicar no botão
+        btn.classList.remove('new');
         Biogame.Game.chooseGene(typeId);
       };
     });
@@ -202,6 +204,7 @@ Biogame.UI = {
       }
     });
   },
+
 
   setupGameListeners() {
     window.addEventListener('biogame:game-started', () => this.onGameStarted());
@@ -396,15 +399,16 @@ Biogame.UI = {
 
     this.updateHUD();
 
-    if (this.elements.currentBubble && state.threats.length > 0) {
-      // O anel de tempo agora é atualizado para a PRIMEIRA ameaça da lista
-      const threat = state.threats[0];
-      const bubble = this.elements.currentBubble;
-      const circle = bubble.querySelector('circle');
-      if (circle) {
-        const offset = 176 * (1 - threat.timeLeft / threat.timeTotal);
-        circle.setAttribute('stroke-dashoffset', offset.toString());
+    // Atualiza todos os anéis de tempo para todas as ameaças ativas
+    state.threats.forEach(threat => {
+      const bubble = document.querySelector(`.threat-bubble[data-type="${threat.typeId}"]`);
+      if (bubble) {
+        const circle = bubble.querySelector('circle');
+        if (circle) {
+          const offset = 176 * (1 - threat.timeLeft / threat.timeTotal);
+          circle.setAttribute('stroke-dashoffset', offset.toString());
+        }
       }
-    }
+    });
   }
 };
