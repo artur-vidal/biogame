@@ -45,6 +45,31 @@ Biogame.Storage = {
       return;
     }
     localStorage.removeItem(fullKey);
+  },
+
+  // Lógica de Ranking para Marco 4
+  saveScore(initials, score) {
+    const ranking = this.get('ranking', []);
+
+    ranking.push({
+      initials: initials.toUpperCase(),
+      score: score,
+      date: Date.now()
+    });
+
+    // Ordena por score (decrescente)
+    ranking.sort((a, b) => b.score - a.score);
+
+    // Mantém apenas o Top N (definido no CONFIG)
+    const topLimit = Biogame.CONFIG.rankingSize || 10;
+    const result = ranking.slice(0, topLimit);
+
+    this.set('ranking', result);
+    return result;
+  },
+
+  getRanking() {
+    return this.get('ranking', []);
   }
 };
 

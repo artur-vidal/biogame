@@ -29,7 +29,9 @@ Biogame.Game = {
     answeredTypes: [],
     cloned: false,
     endReason: null,
-    lastTargetId: null
+    lastTargetId: null,
+    feverMode: false,
+    feverTimer: 0
   },
 
   emit(name, detail = {}) {
@@ -107,6 +109,15 @@ Biogame.Game = {
       return;
     }
 
+    // Gestão do Fever Mode
+    if (this.state.feverMode) {
+      this.state.feverTimer -= dt;
+      if (this.state.feverTimer <= 0) {
+        this.state.feverMode = false;
+        this.emit('fever-ended');
+      }
+    }
+
     if (this.state.timeLeft <= 10 && Math.floor(this.state.timeLeft * 10) % 10 === 0) {
       this.emit('time-warning');
     }
@@ -117,7 +128,13 @@ Biogame.Game = {
     }
 
     if (this.state.threats.length > 0) {
-      this.state.threats.forEach((threat, idx) => {
+      // Copiamos o array para evitar problemas de mutação durante o loop
+      const currentThreats = [...this.state.threats];
+      currentThreats.forEach((threat) => {
+        // Encontramos o índice atual da ameaça, pois o array original muda com splice
+        const idx = this.state.threats.findIndex(t => t === threat);
+        if (idx === -1) return;
+
         threat.timeLeft -= dt;
         if (threat.timeLeft <= 0) {
           this.resolveThreat('timeout', idx);
@@ -139,8 +156,8 @@ Biogame.Game = {
     const gap = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
     // Lógica para múltiplas ameaças simultâneas
-    // Se houver poucas ameaças ativas, spawna mais uma
-    if (this.state.threats.length < 3 && this.rng() < 0.3) {
+    // Aumentamos a chance de spawnar ameaças extras para aumentar a dificuldade
+    if (this.state.threats.length < 3 && this.rng() < 0.6) {
        this.createSingleThreat(timeTotal, gap);
     }
 
@@ -174,20 +191,33 @@ Biogame.Game = {
     const availableTargets = alivePlants.filter(p => p.id !== this.state.lastTargetId);
     const targets = availableTargets.length > 0 ? availableTargets : alivePlants;
 
-    const plantsLackingGene = targets.filter(p => !p.genes.includes(typeId));
+    // Restrição: Uma planta não pode ter mais de uma ameaça ativa ao mesmo tempo
+    const plantsWithoutThreats = targets.filter(p =>
+      !this.state.threats.some(t => t.plantId === p.id)
+    );
+
+    const finalTargets = plantsWithoutThreats.length > 0 ? plantsWithoutThreats : targets;
+
+    const plantsLackingGene = finalTargets.filter(p => !p.genes.includes(typeId));
     let targetPlant;
     if (plantsLackingGene.length > 0 && this.rng() < config.threat.preferLackingChance) {
       targetPlant = plantsLackingGene[Math.floor(this.rng() * plantsLackingGene.length)];
     } else {
-      targetPlant = targets[Math.floor(this.rng() * targets.length)];
+      targetPlant = finalTargets[Math.floor(this.rng() * finalTargets.length)];
     }
 
     this.state.lastTargetId = targetPlant.id;
 
     if (targetPlant.genes.includes(typeId)) {
-      this.emit('threat-spawned', { typeId, plantId: targetPlant.id, auto: true });
-      this.resolveAutoDefense();
+      // A planta já possui o gene, ignoramos completamente para evitar ameaças invisíveis
+      return;
     } else {
+      // IMPORTANTE: Validamos se a planta já tem outra ameaça ativa
+      // Se tiver, não criamos esta para evitar sobrecarga e "deaths" invisíveis
+      if (this.state.threats.some(t => t.plantId === targetPlant.id)) {
+        return;
+      }
+
       this.state.threats.push({
         typeId,
         plantId: targetPlant.id,
@@ -223,8 +253,18 @@ Biogame.Game = {
       const threat = this.state.threats[index];
       this.state.combo += 1;
       const multiplier = Math.min(config.score.comboMax, 1 + Math.floor((this.state.combo - 1) / config.score.comboEvery));
+
+      // Gamificação: Perfect Timing (últimos 10% do tempo)
+      const isPerfect = threat.timeLeft / threat.timeTotal < 0.1;
       const speedBonus = Math.round(config.score.speedBonusMax * (threat.timeLeft / threat.timeTotal));
-      const points = (config.score.correct + speedBonus) * multiplier;
+
+      let points = (config.score.correct + speedBonus) * multiplier;
+      if (isPerfect) points *= 2; // Bônus massivo para Perfect
+
+      // UTILIDADE DO FEVER MODE: Pontos em dobro durante a Febre
+      if (this.state.feverMode) {
+        points *= 2;
+      }
 
       this.state.score += points;
       this.state.correctCount += 1;
@@ -236,7 +276,20 @@ Biogame.Game = {
         this.state.answeredTypes.push(threat.typeId);
       }
 
-      this.emit('gene-correct', { plantId: plant.id, typeId: threat.typeId, points, multiplier });
+      this.emit('gene-correct', {
+        plantId: plant.id,
+        typeId: threat.typeId,
+        points,
+        multiplier,
+        isPerfect
+      });
+
+      // Gamificação: Combo Fever Mode (ativa com 10 combos)
+      if (this.state.combo >= 10 && !this.state.feverMode) {
+        this.state.feverMode = true;
+        this.state.feverTimer = 10.0; // Aumentado para 10 segundos para melhor aproveitamento
+        this.emit('fever-started');
+      }
 
       setTimeout(() => {
         if (this.state.phase === 'playing') this.handleCloning(plant);
@@ -263,23 +316,33 @@ Biogame.Game = {
       this.state.lockLeft = config.wrongRecoveryTime;
       this.state.gapLeft = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
-      if (this.state.lives <= 0) this.end('lives');
+      if (this.state.lives <= 0) {
+        this.end('lives');
+      }
 
     } else if (result === 'timeout') {
+      // Importante: Verificar se a ameaça ainda existe (evita double-dip se houver timeouts simultâneos)
+      if (index < 0 || index >= this.state.threats.length) return;
+
       const threat = this.state.threats[index];
       this.state.lives -= 1;
       this.state.combo = 0;
 
       const plant = this.state.plants.find(p => p.id === threat.plantId);
-      plant.status = 'withered';
+      if (plant) {
+        plant.status = 'withered';
+      }
 
       this.emit('life-lost');
-      this.emit('plant-withered', { plantId: plant.id });
+      this.emit('plant-withered', { plantId: threat.plantId });
 
       setTimeout(() => {
         if (this.state.phase === 'playing') {
-          this.state.plots[plant.plot] = null;
-          this.emit('plot-freed', { plot: plant.plot });
+          const p = this.state.plants.find(pl => pl.id === threat.plantId);
+          if (p) {
+            this.state.plots[p.plot] = null;
+            this.emit('plot-freed', { plot: p.plot });
+          }
         }
       }, config.witherTime * 1000);
 
@@ -287,8 +350,11 @@ Biogame.Game = {
       this.state.lockLeft = 0;
       this.state.gapLeft = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
-      if (this.state.lives <= 0) this.end('lives');
-      if (this.state.plants.filter(p => p.status === 'alive').length === 0) this.end('extinct');
+      if (this.state.lives <= 0) {
+        this.end('lives');
+      } else if (this.state.plants.filter(p => p.status === 'alive').length === 0) {
+        this.end('extinct');
+      }
     }
   },
 
