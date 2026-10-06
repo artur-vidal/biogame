@@ -1,0 +1,25 @@
+:root {
+  /* Cores Base */
+  --color-bg: #14090F;
+  --color-sky-top: #3A1C12;
+  --color-sky-bottom: #E27B58;
+  --color-ground: #8A3B1E;
+  --color-accent: #3DF28A; /* Neon Verde */
+  --color-text: #F4F1EA;
+  --color-danger: #FF5A5F;
+  --color-panel: rgba(20, 9, 15, 0.85);
+
+  /* Cores de Ameaças */
+  --color-threat-cold: #7FD6FF;
+  --color-threat-radiation: #FFD23F;
+  --color-threat-toxic-soil: #B565F2;
+  --color-threat-dehydration: #4DA3FF;
+  --color-threat-nitrogen: #FF9F43;
+
+  /* Tipografia */
+  --font-body: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-title: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* Outros */
+  --radius: 12px;
+}

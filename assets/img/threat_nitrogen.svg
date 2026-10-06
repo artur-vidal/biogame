@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <circle cx="64" cy="64" r="40" fill="#FF9F43" opacity="0.3" />
+  <path d="M64 30 L 85 45 L 85 75 L 64 90 L 43 75 L 43 45 Z" fill="#FF9F43" />
+  <text x="64" y="72" text-anchor="middle" fill="#FFF" font-family="sans-serif" font-weight="bold" font-size="30">N</text>
+</svg>
