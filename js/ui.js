@@ -257,7 +257,8 @@ Biogame.UI = {
       if (plantId !== null) {
         const plant = state.plants.find(p => p.id === plantId);
         if (plant && plant.status === 'alive') {
-          plantElem.appendChild(Biogame.Assets.createImg(plant.variant));
+          const plantImg = Biogame.Assets.createImg(plant.variant);
+          plantElem.appendChild(plantImg);
 
           const badges = document.createElement('div');
           badges.className = 'badges';
@@ -271,6 +272,7 @@ Biogame.UI = {
       }
     });
   },
+
 
   onThreatSpawned({ typeId, plantId, auto }) {
     this.updateHUD();

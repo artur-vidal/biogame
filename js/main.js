@@ -28,15 +28,18 @@ Biogame.Main = {
     const stageH = 720;
 
     const scale = Math.min(winW / stageW, winH / stageH);
+
+    stage.style.width = `${stageW}px`;
+    stage.style.height = `${stageH}px`;
     stage.style.transform = `scale(${scale})`;
     stage.style.position = 'absolute';
 
-    // Centralização absoluta corrigindo offsets de borda do body
+    // Centralização robusta
     stage.style.left = '50%';
     stage.style.top = '50%';
-    stage.style.marginLeft = `${-stageW * scale / 2}px`;
-    stage.style.marginTop = `${-stageH * scale / 2}px`;
+    stage.style.transform = `translate(-50%, -50%) scale(${scale})`;
   },
+
 
 
   loop() {
