@@ -42,7 +42,6 @@ Biogame.UI = {
 
     const muteBtn = document.createElement('button');
     muteBtn.id = 'mute-btn';
-    muteBtn.appendChild(Biogame.Assets.createImg('shield'));
 
     hud.appendChild(scoreCont);
     hud.appendChild(timerCont);
@@ -219,7 +218,6 @@ Biogame.UI = {
     window.addEventListener('biogame:game-over', (e) => this.onGameOver(e.detail));
   },
 
-  // Handlers de Eventos do Jogo
   onGameStarted() {
     this.updateHUD();
     this.updateGarden();
@@ -237,7 +235,6 @@ Biogame.UI = {
     const totalTime = Biogame.CONFIG.totalTime;
     this.elements.timerFill.style.width = `${(state.timeLeft / totalTime) * 100}%`;
 
-    // Vidas
     this.elements.hearts.innerHTML = '';
     for (let i = 0; i < state.lives; i++) {
       this.elements.hearts.appendChild(Biogame.Assets.createImg('heart_full'));
@@ -257,13 +254,10 @@ Biogame.UI = {
       if (plantId !== null) {
         const plant = state.plants.find(p => p.id === plantId);
         if (plant && plant.status === 'alive') {
-          // Usar a chave da imagem em vez do caminho direto
           const imgKey = plant.variant.includes('assets/img/') ?
                          plant.variant.split('/').pop().replace('.svg', '') :
                          plant.variant;
-
-          const plantImg = Biogame.Assets.createImg(imgKey);
-          plantElem.appendChild(plantImg);
+          plantElem.appendChild(Biogame.Assets.createImg(imgKey));
 
           const badges = document.createElement('div');
           badges.className = 'badges';
@@ -277,7 +271,6 @@ Biogame.UI = {
       }
     });
   },
-
 
   onThreatSpawned({ typeId, plantId, auto }) {
     this.updateHUD();
@@ -300,7 +293,6 @@ Biogame.UI = {
     name.textContent = type.threatName;
     bubble.appendChild(name);
 
-    // Anel de Tempo
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '64');
     svg.setAttribute('height', '64');
@@ -342,13 +334,12 @@ Biogame.UI = {
     this.removeBubble();
 
     const type = Biogame.DATA.types.find(t => t.id === expected);
-    this.elements.factText.textContent = Biogame.STR.game.wrong.replace('{label}', type.label);
+    this.elements.factText.textContent = type ? Biogame.STR.game.wrong.replace('{label}', type.label) : 'Gene incorreto!';
   },
 
   onAutoDefense() {
     this.updateHUD();
     this.removeBubble();
-    // Feedback visual de escudo seria no M6
   },
 
   onLifeLost() {
@@ -366,7 +357,6 @@ Biogame.UI = {
 
   onCloneBorn({ sourceId, newId, plot }) {
     this.updateGarden();
-    // Animação de brotar no M6
   },
 
   onTypeUnlocked({ typeId }) {
@@ -385,7 +375,7 @@ Biogame.UI = {
   },
 
   onGameOver({ score, alive, reason }) {
-    this.elements.intro.classList.add('active'); // Reutiliza overlay para simplicidade no M2
+    this.elements.intro.classList.add('active');
     const panel = this.elements.intro.querySelector('.panel');
     panel.innerHTML = `<h1>${reason === 'time' ? Biogame.STR.over.timeUp : Biogame.STR.over.lost}</h1>
                        <p>${Biogame.STR.over.score}: ${score}</p>
@@ -400,18 +390,21 @@ Biogame.UI = {
     }
   },
 
-  // loop de atualização da UI (chamado pelo main.js)
   update() {
     const state = Biogame.Game.state;
     if (state.phase !== 'playing') return;
 
     this.updateHUD();
 
-    if (this.elements.currentBubble && state.threat) {
+    if (this.elements.currentBubble && state.threats.length > 0) {
+      // O anel de tempo agora é atualizado para a PRIMEIRA ameaça da lista
+      const threat = state.threats[0];
       const bubble = this.elements.currentBubble;
       const circle = bubble.querySelector('circle');
-      const offset = 176 * (1 - state.threat.timeLeft / state.threat.timeTotal);
-      circle.setAttribute('stroke-dashoffset', offset.toString());
+      if (circle) {
+        const offset = 176 * (1 - threat.timeLeft / threat.timeTotal);
+        circle.setAttribute('stroke-dashoffset', offset.toString());
+      }
     }
   }
 };

@@ -6,7 +6,6 @@
     </linearGradient>
   </defs>
   <rect width="1280" height="720" fill="url(#skyGrad)" />
-  <circle cx="1100" cy="100" r="40" fill="#F4F1EA" opacity="0.3" />
   <path d="M0 540 Q 300 480 600 540 T 1280 540 V 720 H 0 Z" fill="#6B2D17" />
   <path d="M0 600 Q 200 560 400 600 T 1280 600 V 720 H 0 Z" fill="#8A3B1E" />
   <circle cx="200" cy="620" r="20" fill="#5A2B17" />

@@ -21,17 +21,17 @@ Biogame.Game = {
     correctCount: 0,
     plants: [],
     plots: [],
-    threat: null,
+    threats: [], // Agora é uma lista para suportar múltiplas ameaças simultâneas
     gapLeft: 0,
     lockLeft: 0,
     unlocked: [],
     pendingNew: [],
     answeredTypes: [],
     cloned: false,
-    endReason: null
+    endReason: null,
+    lastTargetId: null // Para evitar que a mesma planta peça genes consecutivamente
   },
 
-  // Eventos simples via CustomEvent para a UI assinar
   emit(name, detail = {}) {
     window.dispatchEvent(new CustomEvent(`biogame:${name}`, { detail }));
   },
@@ -53,31 +53,27 @@ Biogame.Game = {
     this.state.endReason = null;
     this.state.answeredTypes = [];
     this.state.pendingNew = [];
+    this.state.lastTargetId = null;
 
-    // Inicializa plots (8 posições)
     this.state.plots = new Array(config.plots).fill(null);
     this.state.plants = [];
 
-    // Coloca as plantas iniciais
     config.startPlots.forEach(plotIdx => {
       this.addPlant(plotIdx);
     });
 
-    // Libera genes iniciais
     this.state.unlocked = Biogame.DATA.types.map((type, idx) => {
       const isUnlocked = config.unlockAtCorrect[idx] === 0;
       if (isUnlocked) {
         this.state.pendingNew.push(type.id);
-        // Notifica a UI imediatamente para desbloquear os botões iniciais
         this.emit('type-unlocked', { typeId: type.id });
       }
       return isUnlocked;
     });
 
-
     this.state.gapLeft = config.threat.gapStart;
     this.state.lockLeft = 0;
-    this.state.threat = null;
+    this.state.threats = [];
 
     this.emit('game-started');
   },
@@ -92,7 +88,7 @@ Biogame.Game = {
     const plant = {
       id,
       plot: plotIdx,
-      genes: [...genes],
+      genes: [], // Fix: TODA planta começa com genes zerados
       status: 'alive',
       variant: plantVariant
     };
@@ -105,30 +101,28 @@ Biogame.Game = {
   update(dt) {
     if (this.state.phase !== 'playing') return;
 
-    // 1. Cronômetro Geral
     this.state.timeLeft -= dt;
     if (this.state.timeLeft <= 0) {
       this.end('time');
       return;
     }
 
-    // Aviso de tempo final
     if (this.state.timeLeft <= 10 && Math.floor(this.state.timeLeft * 10) % 10 === 0) {
       this.emit('time-warning');
     }
 
-    // 2. Trava de animação
     if (this.state.lockLeft > 0) {
       this.state.lockLeft -= dt;
       if (this.state.lockLeft < 0) this.state.lockLeft = 0;
     }
 
-    // 3. Gestão de Ameaças
-    if (this.state.threat) {
-      this.state.threat.timeLeft -= dt;
-      if (this.state.threat.timeLeft <= 0) {
-        this.resolveThreat('timeout');
-      }
+    if (this.state.threats.length > 0) {
+      this.state.threats.forEach((threat, idx) => {
+        threat.timeLeft -= dt;
+        if (threat.timeLeft <= 0) {
+          this.resolveThreat('timeout', idx);
+        }
+      });
     } else if (this.state.lockLeft === 0) {
       this.state.gapLeft -= dt;
       if (this.state.gapLeft <= 0) {
@@ -141,54 +135,57 @@ Biogame.Game = {
     const config = Biogame.CONFIG;
     const types = Biogame.DATA.types;
 
-    // Tempo da ameaça e intervalo seguinte
     const timeTotal = Math.max(config.threat.minTime, config.threat.startTime - config.threat.step * this.state.correctCount);
     const gap = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
-    // Escolha do Tipo
     let typeId;
     if (this.state.pendingNew.length > 0) {
       typeId = this.state.pendingNew.shift();
       this.emit('new-type', { typeId });
     } else {
       const unlockedTypes = types.filter((t, idx) => this.state.unlocked[idx]);
-      // Evita repetir o anterior se houver mais de um
       let possibleTypes = unlockedTypes;
-      if (unlockedTypes.length > 1 && this.state.threat) {
-        possibleTypes = unlockedTypes.filter(t => t.id !== this.state.threat.typeId);
+      if (unlockedTypes.length > 1 && this.state.threats.length > 0) {
+        const activeTypes = this.state.threats.map(t => t.typeId);
+        possibleTypes = unlockedTypes.filter(t => !activeTypes.includes(t.id));
+        if (possibleTypes.length === 0) possibleTypes = unlockedTypes;
       }
       const chosen = possibleTypes[Math.floor(this.rng() * possibleTypes.length)];
       typeId = chosen.id;
     }
 
-    // Escolha da Planta Alvo
     const alivePlants = this.state.plants.filter(p => p.status === 'alive');
     if (alivePlants.length === 0) {
       this.end('extinct');
       return;
     }
 
-    const plantsLackingGene = alivePlants.filter(p => !p.genes.includes(typeId));
+    // Fix: A mesma planta não deve pedir dois genes consecutivamente
+    const availableTargets = alivePlants.filter(p => p.id !== this.state.lastTargetId);
+    const targets = availableTargets.length > 0 ? availableTargets : alivePlants;
+
+    const plantsLackingGene = targets.filter(p => !p.genes.includes(typeId));
     let targetPlant;
     if (plantsLackingGene.length > 0 && this.rng() < config.threat.preferLackingChance) {
       targetPlant = plantsLackingGene[Math.floor(this.rng() * plantsLackingGene.length)];
     } else {
-      targetPlant = alivePlants[Math.floor(this.rng() * alivePlants.length)];
+      targetPlant = targets[Math.floor(this.rng() * targets.length)];
     }
 
-    // Defesa Automática
+    this.state.lastTargetId = targetPlant.id;
+
     if (targetPlant.genes.includes(typeId)) {
       this.emit('threat-spawned', { typeId, plantId: targetPlant.id, auto: true });
       this.resolveAutoDefense();
       this.state.gapLeft = gap;
       this.state.lockLeft = config.autoDefenseTime;
     } else {
-      this.state.threat = {
+      this.state.threats.push({
         typeId,
         plantId: targetPlant.id,
         timeTotal: timeTotal,
         timeLeft: timeTotal
-      };
+      });
       this.emit('threat-spawned', { typeId, plantId: targetPlant.id, auto: false });
       this.state.gapLeft = gap;
     }
@@ -200,22 +197,24 @@ Biogame.Game = {
   },
 
   chooseGene(typeId) {
-    if (this.state.phase !== 'playing' || !this.state.threat) return;
+    if (this.state.phase !== 'playing' || this.state.threats.length === 0) return;
     if (!this.state.unlocked[Biogame.DATA.types.findIndex(t => t.id === typeId)]) return;
 
-    if (typeId === this.state.threat.typeId) {
-      this.resolveThreat('correct');
+    // Bug Fix: O erro só ocorre se o gene não for pedido por NENHUMA planta ativa
+    const targetIndex = this.state.threats.findIndex(t => t.typeId === typeId);
+
+    if (targetIndex !== -1) {
+      this.resolveThreat('correct', targetIndex);
     } else {
-      this.resolveThreat('wrong', typeId);
+      this.resolveThreat('wrong', -1, typeId);
     }
   },
 
-  resolveThreat(result, chosenId = null) {
+  resolveThreat(result, index, chosenId = null) {
     const config = Biogame.CONFIG;
-    const threat = this.state.threat;
 
     if (result === 'correct') {
-      // Pontos e Combo
+      const threat = this.state.threats[index];
       this.state.combo += 1;
       const multiplier = Math.min(config.score.comboMax, 1 + Math.floor((this.state.combo - 1) / config.score.comboEvery));
       const speedBonus = Math.round(config.score.speedBonusMax * (threat.timeLeft / threat.timeTotal));
@@ -224,23 +223,19 @@ Biogame.Game = {
       this.state.score += points;
       this.state.correctCount += 1;
 
-      // Gene
       const plant = this.state.plants.find(p => p.id === threat.plantId);
       plant.genes.push(threat.typeId);
 
-      const type = Biogame.DATA.types.find(t => t.id === threat.typeId);
       if (!this.state.answeredTypes.includes(threat.typeId)) {
         this.state.answeredTypes.push(threat.typeId);
       }
 
       this.emit('gene-correct', { plantId: plant.id, typeId: threat.typeId, points, multiplier });
 
-      // Clone
       setTimeout(() => {
         if (this.state.phase === 'playing') this.handleCloning(plant);
       }, config.cloneDelay * 1000);
 
-      // Liberação de novos genes
       Biogame.DATA.types.forEach((type, idx) => {
         if (!this.state.unlocked[idx] && this.state.correctCount >= config.unlockAtCorrect[idx]) {
           this.state.unlocked[idx] = true;
@@ -249,22 +244,24 @@ Biogame.Game = {
         }
       });
 
-      this.state.threat = null;
+      this.state.threats.splice(index, 1);
       this.state.lockLeft = 0.3;
       this.state.gapLeft = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
     } else if (result === 'wrong') {
       this.state.lives -= 1;
       this.state.combo = 0;
-      this.emit('gene-wrong', { chosen: chosenId, expected: threat.typeId });
+      this.emit('gene-wrong', { chosen: chosenId, expected: 'Qualquer um dos genes pedidos' });
 
-      this.state.threat = null;
+      // Remove todas as ameaças atuais para penalizar o erro
+      this.state.threats = [];
       this.state.lockLeft = config.wrongRecoveryTime;
       this.state.gapLeft = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
       if (this.state.lives <= 0) this.end('lives');
 
     } else if (result === 'timeout') {
+      const threat = this.state.threats[index];
       this.state.lives -= 1;
       this.state.combo = 0;
 
@@ -281,7 +278,7 @@ Biogame.Game = {
         }
       }, config.witherTime * 1000);
 
-      this.state.threat = null;
+      this.state.threats.splice(index, 1);
       this.state.lockLeft = 0;
       this.state.gapLeft = Math.max(config.threat.gapMin, config.threat.gapStart - config.threat.gapStep * this.state.correctCount);
 
